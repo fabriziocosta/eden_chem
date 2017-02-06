@@ -24,16 +24,24 @@ def _get_compounds(fname, size, listkey, stepsize=50):
         index_start = 0
         for chunk, index_end in enumerate(range(0, size + stepsize, stepsize)):
             if index_end is not 0:
-                t = 'Chunk %s) Processing compounds %s to %s (%s)' % \
-                    (chunk, index_start, index_end - 1, size)
-                logger.debug(t)
-                query = root_uri
-                query += 'compound/listkey/' + str(listkey)
-                query += '/SDF?&listkey_start=' + str(index_start)
-                query += '&listkey_count=' + str(stepsize)
-                reply = requests.get(query)
-                file_handle.write(reply.text)
+                repeat = True
+                while repeat:
+                    t = 'Chunk %s) Processing compounds %s to %s (%s)' % \
+                        (chunk, index_start, index_end - 1, size)
+                    logger.debug(t)
+                    query = root_uri
+                    query += 'compound/listkey/' + str(listkey)
+                    query += '/SDF?&listkey_start=' + str(index_start)
+                    query += '&listkey_count=' + str(stepsize)
+                    reply = requests.get(query)
+                    if 'PUGREST.Timeout' not in reply.text:
+                        repeat=False
+                        file_handle.write(reply.text)
+                    else:
+                        print "PUGREST TIMEOUT"
+
             index_start = index_end
+
         print 'compounds available in file: ', fname
 
 
@@ -53,7 +61,8 @@ def _query_db(assay_id, fname=None, active=True, stepsize=50):
     # extract the listkey
     listkey = reply.json()['IdentifierList']['ListKey']
     size = reply.json()['IdentifierList']['Size']
-    _get_compounds(fname=fname, size=size, listkey=listkey, stepsize=stepsize)
+    _get_compounds(fname=fname+".tmp", size=size, listkey=listkey, stepsize=stepsize)
+    os.rename(fname+'.tmp',fname)
 
 
 def download(assay_id, active=True, stepsize=50):

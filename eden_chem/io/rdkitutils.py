@@ -58,7 +58,8 @@ def sdf_to_nx(file):
     # read sdf file
     suppl = Chem.SDMolSupplier(file)
     for mol in suppl:
-        yield rdkmol_to_nx(mol)
+        if mol:
+            yield rdkmol_to_nx(mol)
 
 
 def smi_to_nx(file):
