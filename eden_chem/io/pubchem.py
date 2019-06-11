@@ -8,15 +8,26 @@ logger = logging.getLogger(__name__)
 
 
 root_uri = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/'
+_pubchem_dir_ = 'PUBCHEM'
 
 
 def get_assay_description(assay_id):
     """get_assay_description."""
-    query = root_uri
-    query += 'assay/aid/%s/summary/JSON' % assay_id
-    reply = requests.get(query)
-    name = reply.json()['AssaySummaries']['AssaySummary'][0]['Name']
-    return name
+    fname = 'AID%s_info.txt' % assay_id
+    full_fname = os.path.join(_pubchem_dir_, fname)
+    if not os.path.isfile(full_fname):
+        query = root_uri
+        query += 'assay/aid/%s/summary/JSON' % assay_id
+        reply = requests.get(query)
+        text = reply.json()['AssaySummaries']['AssaySummary'][0]['Name']
+        with open(full_fname, 'w') as file_handle:
+            file_handle.write(text)
+    else:
+        with open(full_fname, 'r') as file_handle:
+            text = ''
+            for line in file_handle:
+                text += line
+    return text
 
 
 def _get_compounds(fname, active, aid, stepsize=50):
@@ -26,7 +37,6 @@ def _get_compounds(fname, active, aid, stepsize=50):
         reply = requests.get(_make_rest_query(aid, active=active))
         listkey = reply.json()['IdentifierList']['ListKey']
         size = reply.json()['IdentifierList']['Size']
-
 
         for chunk, index_end in enumerate(range(0, size + stepsize, stepsize)):
             if index_end is not 0:
@@ -41,25 +51,28 @@ def _get_compounds(fname, active, aid, stepsize=50):
                     query += '&listkey_count=' + str(stepsize)
                     reply = requests.get(query)
                     if 'PUGREST.Timeout' in reply.text:
-                        print "PUGREST TIMEOUT"
+                        logger.debug("PUGREST TIMEOUT")
                     elif "PUGREST.BadRequest" in reply.text:
-                        # bad request means that the server throw our molecule list away.
+                        # bad request means that the server throw our
+                        # molecule list away.
                         # we just make a new one
-                        print 'bad request %s %d %d %d' % (query,chunk,index_end,size)
-                        reply = requests.get(_make_rest_query(aid, active=active))
+                        logger.debug('bad request %s %d %d %d' % (
+                            query, chunk, index_end, size))
+                        reply = requests.get(
+                            _make_rest_query(aid, active=active))
                         listkey = reply.json()['IdentifierList']['ListKey']
                     elif reply.status_code != 200:
-                        print "UNKNOWN ERRA " + query
-                        print reply.status_code
-                        print reply.text
-                        exit()
-                    else: # everything is OK
-                        repeat=False
+                        logger.debug("UNKNOWN ERRA " + query)
+                        logger.debug(reply.status_code)
+                        logger.debug(reply.text)
+                        raise Exception('UNKNOWN')
+                    else:  # everything is OK
+                        repeat = False
                         file_handle.write(reply.text)
 
             index_start = index_end
 
-        print 'compounds available in file: ', fname
+        logger.debug('compounds available in file: ', fname)
 
 
 def _make_rest_query(assay_id, active=True):
@@ -74,20 +87,22 @@ def _make_rest_query(assay_id, active=True):
 
 
 def _query_db(assay_id, fname=None, active=True, stepsize=50):
-    _get_compounds(fname=fname+".tmp", active=active, aid=assay_id, stepsize=stepsize)
-    os.rename(fname+'.tmp',fname)
+    _get_compounds(fname=fname + ".tmp",
+                   active=active,
+                   aid=assay_id,
+                   stepsize=stepsize)
+    os.rename(fname + '.tmp', fname)
 
 
 def download(assay_id, active=True, stepsize=50):
     """download."""
-    pubchem_dir = 'PUBCHEM'
-    if not os.path.exists(pubchem_dir):
-        os.mkdir(pubchem_dir)
+    if not os.path.exists(_pubchem_dir_):
+        os.mkdir(_pubchem_dir_)
     if active:
         fname = 'AID%s_active.sdf' % assay_id
     else:
         fname = 'AID%s_inactive.sdf' % assay_id
-    full_fname = os.path.join(pubchem_dir, fname)
+    full_fname = os.path.join(_pubchem_dir_, fname)
     if not os.path.isfile(full_fname):
         logger.debug('Querying PubChem for AID: %s' % assay_id)
         _query_db(assay_id,

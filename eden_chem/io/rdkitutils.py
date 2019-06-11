@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class MoleculeToGraph(BaseEstimator, TransformerMixin):
+
     def __init__(self, file_format='sdf'):
         """Constructor.
 
@@ -75,7 +76,8 @@ def rdkmol_to_nx(mol):
     for e in mol.GetAtoms():
         graph.add_node(e.GetIdx(), label=e.GetSymbol())
     for b in mol.GetBonds():
-        graph.add_edge(b.GetBeginAtomIdx(), b.GetEndAtomIdx(), label=str(int(b.GetBondTypeAsDouble())))
+        graph.add_edge(b.GetBeginAtomIdx(), b.GetEndAtomIdx(),
+                       label=str(int(b.GetBondTypeAsDouble())))
     return graph
 
 
@@ -90,12 +92,14 @@ def smiles_strings_to_nx(smileslist):
 # exporting networkx graphs
 ###############
 
-def nx_to_smi(graphs, file):
+def nx_to_smi(graphs, file=None):
     # writes smiles strings to a file
     chem = [nx_to_rdkit(graph) for graph in graphs]
     smis = [Chem.MolToSmiles(m) for m in chem]
-    with open(file, 'w') as f:
-        f.write('\n'.join(smis))
+    if file:
+        with open(file, 'w') as f:
+            f.write('\n'.join(smis))
+    return smis
 
 
 def nx_to_rdkit(graph):
@@ -121,7 +125,3 @@ def nx_to_rdkit(graph):
 
     mol = mw.GetMol()
     return mol
-
-
-
-
